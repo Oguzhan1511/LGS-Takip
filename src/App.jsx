@@ -592,10 +592,45 @@ export default function LGSTakipSistemi() {
     triggerConfetti();
   }, []);
 
+  const handleResetToFresh = useCallback(() => {
+    if (!window.confirm("Tüm verileri temizleyip sıfırdan boş bir öğrenci hesabı açmak istediğinize emin misiniz?")) return;
+    const cleanProfile = defaultProfile();
+    const cleanKonular = defaultKonular();
+    const cleanProgram = {};
+    const cleanDenemeler = [];
+    const cleanYanlislar = [];
+    const cleanSoruGecmisi = [];
+    const cleanHaftalikGecmis = [];
+    const cleanKaynaklar = [];
+    const cleanRefleksiyonlar = [];
+
+    setProfile(cleanProfile);
+    setKonular(cleanKonular);
+    setProgram(cleanProgram);
+    setDenemeler(cleanDenemeler);
+    setYanlislar(cleanYanlislar);
+    setSoruGecmisi(cleanSoruGecmisi);
+    setHaftalikGecmis(cleanHaftalikGecmis);
+    setKaynaklar(cleanKaynaklar);
+    setRefleksiyonlar(cleanRefleksiyonlar);
+
+    saveKey("lgs_initialized", true);
+    saveKey("lgs_profile", cleanProfile);
+    saveKey("lgs_denemeler", cleanDenemeler);
+    saveKey("lgs_program", cleanProgram);
+    saveKey("lgs_haftalik_gecmis", cleanHaftalikGecmis);
+    saveKey("lgs_kaynaklar", cleanKaynaklar);
+    saveKey("lgs_yanlislar", cleanYanlislar);
+    saveKey("lgs_refleksiyonlar", cleanRefleksiyonlar);
+    saveKey("lgs_konular", cleanKonular);
+    saveKey("lgs_soru_gecmisi", cleanSoruGecmisi);
+  }, []);
+
   // Verileri Yükle (İlk açılışta zengin 1 aylık test verisiyle başlat)
   useEffect(() => {
     (async () => {
       const mock = generate1MonthMockData();
+      const isInit = await loadKey("lgs_initialized", false);
       const [p, d, k, pr, y, sg, hg, ky, rf] = await Promise.all([
         loadKey("lgs_profile", null),
         loadKey("lgs_denemeler", null),
@@ -608,25 +643,49 @@ export default function LGSTakipSistemi() {
         loadKey("lgs_refleksiyonlar", null),
       ]);
 
-      const finalProfile = p && p.isim && p.isim.trim() ? { ...mock.profile, ...p } : mock.profile;
-      const finalDenemeler = (d && Array.isArray(d) && d.length > 0) ? d : mock.denemeler;
-      const finalKonular = (k && Object.keys(k).length > 0 && Object.values(k).some(sub => Object.values(sub).some(st => st !== "bekliyor"))) ? k : mock.konular;
-      const finalProgram = (pr && Object.keys(pr).length > 0 && Object.values(pr).some(arr => Array.isArray(arr) && arr.length > 0)) ? pr : mock.program;
-      const finalYanlislar = (y && Array.isArray(y) && y.length > 0) ? y : mock.yanlislar;
-      const finalSoruGecmisi = (sg && Array.isArray(sg) && sg.length > 0) ? sg : mock.soruGecmisi;
-      const finalHaftalikGecmis = (hg && Array.isArray(hg) && hg.length >= 3) ? hg : mock.haftalikGecmis;
-      const finalKaynaklar = (ky && Array.isArray(ky) && ky.length > 0) ? ky : mock.kaynaklar;
-      const finalRefleksiyonlar = (rf && Array.isArray(rf) && rf.length > 0) ? rf : mock.refleksiyonlar;
+      if (isInit) {
+        setProfile(p || defaultProfile());
+        setDenemeler(d || []);
+        setKonular(k || defaultKonular());
+        setProgram(pr || {});
+        setYanlislar(y || []);
+        setSoruGecmisi(sg || []);
+        setHaftalikGecmis(hg || []);
+        setKaynaklar(ky || []);
+        setRefleksiyonlar(rf || []);
+      } else {
+        // İlk kez açılıyorsa örnek 1 aylık verileri yükle ve başlat
+        saveKey("lgs_initialized", true);
+        const finalProfile = p && p.isim && p.isim.trim() ? { ...mock.profile, ...p } : mock.profile;
+        const finalDenemeler = (d && Array.isArray(d) && d.length > 0) ? d : mock.denemeler;
+        const finalKonular = (k && Object.keys(k).length > 0) ? k : mock.konular;
+        const finalProgram = (pr && Object.keys(pr).length > 0) ? pr : mock.program;
+        const finalYanlislar = (y && Array.isArray(y) && y.length > 0) ? y : mock.yanlislar;
+        const finalSoruGecmisi = (sg && Array.isArray(sg) && sg.length > 0) ? sg : mock.soruGecmisi;
+        const finalHaftalikGecmis = (hg && Array.isArray(hg) && hg.length > 0) ? hg : mock.haftalikGecmis;
+        const finalKaynaklar = (ky && Array.isArray(ky) && ky.length > 0) ? ky : mock.kaynaklar;
+        const finalRefleksiyonlar = (rf && Array.isArray(rf) && rf.length > 0) ? rf : mock.refleksiyonlar;
 
-      setProfile(finalProfile);
-      setDenemeler(finalDenemeler);
-      setKonular(finalKonular);
-      setProgram(finalProgram);
-      setYanlislar(finalYanlislar);
-      setSoruGecmisi(finalSoruGecmisi);
-      setHaftalikGecmis(finalHaftalikGecmis);
-      setKaynaklar(finalKaynaklar);
-      setRefleksiyonlar(finalRefleksiyonlar);
+        setProfile(finalProfile);
+        setDenemeler(finalDenemeler);
+        setKonular(finalKonular);
+        setProgram(finalProgram);
+        setYanlislar(finalYanlislar);
+        setSoruGecmisi(finalSoruGecmisi);
+        setHaftalikGecmis(finalHaftalikGecmis);
+        setKaynaklar(finalKaynaklar);
+        setRefleksiyonlar(finalRefleksiyonlar);
+
+        saveKey("lgs_profile", finalProfile);
+        saveKey("lgs_denemeler", finalDenemeler);
+        saveKey("lgs_konular", finalKonular);
+        saveKey("lgs_program", finalProgram);
+        saveKey("lgs_yanlislar", finalYanlislar);
+        saveKey("lgs_soru_gecmisi", finalSoruGecmisi);
+        saveKey("lgs_haftalik_gecmis", finalHaftalikGecmis);
+        saveKey("lgs_kaynaklar", finalKaynaklar);
+        saveKey("lgs_refleksiyonlar", finalRefleksiyonlar);
+      }
       setLoaded(true);
     })();
   }, []);
