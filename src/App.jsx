@@ -1196,6 +1196,7 @@ export default function LGSTakipSistemi() {
                 if (data.refleksiyonlar) setRefleksiyonlar(data.refleksiyonlar);
                 triggerConfetti();
               }}
+              onResetToFresh={handleResetToFresh}
             />
           )}
         </main>
@@ -4253,7 +4254,8 @@ function Hedefler({
   haftalikGecmis = [],
   streak,
   onLoadSimulation,
-  onImportAll
+  onImportAll,
+  onResetToFresh
 }) {
   const [simResults, setSimResults] = useState({
     turkce: { dogru: 18, yanlis: 2 },
@@ -4563,6 +4565,13 @@ function Hedefler({
               className="btn-primary flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold"
             >
               <Upload size={15} /> Yedek Yükle
+            </button>
+
+            <button
+              onClick={onResetToFresh}
+              className="btn-primary bg-red-500 hover:bg-red-600 shadow-red-500/20 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white transition-colors border-none"
+            >
+              <RotateCcw size={15} /> Tüm Verileri Sıfırla
             </button>
           </div>
         </div>
