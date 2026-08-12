@@ -569,6 +569,39 @@ function calculateLGSScore(results, formula = "3") {
   return Math.min(500, Math.max(100, Math.round(total * 100) / 100));
 }
 
+// 2026 Yüzdelik Dilim Tahminleyici (LGS Yaklaşık Dağılımı)
+function calculateLGSPercentile2026(score) {
+  const distribution = [
+    { score: 500, percentile: 0.01 },
+    { score: 490, percentile: 0.50 },
+    { score: 480, percentile: 1.50 },
+    { score: 470, percentile: 3.00 },
+    { score: 460, percentile: 4.80 },
+    { score: 450, percentile: 7.00 },
+    { score: 440, percentile: 9.50 },
+    { score: 420, percentile: 14.00 },
+    { score: 400, percentile: 20.00 },
+    { score: 350, percentile: 35.00 },
+    { score: 300, percentile: 55.00 },
+    { score: 250, percentile: 75.00 },
+    { score: 100, percentile: 100.00 },
+  ];
+  if (score >= 500) return "0.01";
+  if (score <= 100) return "100.00";
+  for (let i = 0; i < distribution.length - 1; i++) {
+    const upper = distribution[i];
+    const lower = distribution[i + 1];
+    if (score <= upper.score && score > lower.score) {
+      const scoreDiff = upper.score - lower.score;
+      const pctDiff = lower.percentile - upper.percentile;
+      const scoreOffset = score - lower.score;
+      const exactPct = lower.percentile - (scoreOffset / scoreDiff) * pctDiff;
+      return exactPct.toFixed(2);
+    }
+  }
+  return "100.00";
+}
+
 /* ---------------------------------------------------------------------- */
 /* ANA UYGULAMA BİLEŞENİ                                                  */
 /* ---------------------------------------------------------------------- */
@@ -2692,7 +2725,7 @@ function Denemeler({ denemeler, netFormulu, onAdd, onDelete }) {
                           {net.toFixed(2)} Net
                         </div>
                         <div className="text-[11px] font-mono font-semibold text-emerald-600">
-                          {score} Puan
+                          {score} Puan (≈ %{calculateLGSPercentile2026(score)})
                         </div>
                       </div>
 
@@ -4489,9 +4522,12 @@ function Hedefler({
               </div>
             </div>
             <div className="text-right">
-              <div className="text-xs font-semibold text-slate-500">Tahmini LGS Puanı</div>
+              <div className="text-xs font-semibold text-slate-500">Tahmini Puan & Yüzdelik</div>
               <div className="font-mono text-3xl font-extrabold text-emerald-600">
                 {calculatedSimScore}
+              </div>
+              <div className="text-[11px] font-semibold text-emerald-600/80 mt-1">
+                LGS 2026: ≈ %{calculateLGSPercentile2026(calculatedSimScore)}
               </div>
             </div>
           </div>
