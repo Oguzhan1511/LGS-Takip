@@ -22,6 +22,7 @@ import { BadgesLevel } from "./components/BadgesLevel";
 import { DailyReflection } from "./components/DailyReflection";
 import { calculateGamification } from "./utils/gamification";
 import { generate1MonthMockData } from "./data/mockStudentData";
+import { supabase } from "./utils/supabaseClient";
 
 /* ---------------------------------------------------------------------- */
 /* SABİTLER                                                                */
@@ -169,10 +170,25 @@ function fmtDate(iso) {
 
 async function loadKey(key, fallback) {
   try {
-    if (typeof window !== "undefined" && window.storage && typeof window.storage.get === "function") {
-      const res = await window.storage.get(key, false);
-      if (res && res.value) return JSON.parse(res.value);
+    const { data, error } = await supabase
+      .from('app_state')
+      .select(key)
+      .eq('user_id', 'default_user')
+      .maybeSingle();
+
+    if (error) {
+      console.error("Supabase okuma hatası:", key, error);
     }
+
+    if (data && data[key] !== null && data[key] !== undefined) {
+      // Eğer Supabase'de data boş bir obje veya array gelmişse fallback'e dönmemesi için dikkat ediyoruz
+      if (Object.keys(data[key]).length === 0 && Array.isArray(data[key]) === false && typeof data[key] === 'object' && fallback !== undefined) {
+          // Empty object returned from PG, it's ok.
+      }
+      return data[key];
+    }
+
+    // Supabase'de yoksa, eski localStorage'dan okumayı dene (Geçiş süreci)
     const val = localStorage.getItem(key);
     return val ? JSON.parse(val) : fallback;
   } catch (e) {
@@ -182,9 +198,15 @@ async function loadKey(key, fallback) {
 
 async function saveKey(key, value) {
   try {
-    if (typeof window !== "undefined" && window.storage && typeof window.storage.set === "function") {
-      await window.storage.set(key, JSON.stringify(value), false);
+    const { error } = await supabase
+      .from('app_state')
+      .upsert({ user_id: 'default_user', [key]: value, updated_at: new Date().toISOString() });
+      
+    if (error) {
+      console.error("Supabase yazma hatası:", key, error);
     }
+
+    // Yedek olarak LocalStorage'a da yaz
     localStorage.setItem(key, JSON.stringify(value));
   } catch (e) {
     console.error("Kayıt hatası:", key, e);
@@ -4340,6 +4362,18 @@ function Hedefler({
                   value={profile.hedefPuan}
                   onChange={(e) => setProfile((p) => ({ ...p, hedefPuan: Number(e.target.value) || 0 }))}
                 />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Veli Telegram Chat ID</label>
+                <TinyInput
+                  value={profile.veliTelefon || ""}
+                  placeholder="Örn: 123456789"
+                  onChange={(e) => setProfile((p) => ({ ...p, veliTelefon: e.target.value }))}
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Günlük raporlar bu ID'ye Telegram üzerinden gönderilir.</p>
               </div>
             </div>
 
