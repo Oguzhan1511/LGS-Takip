@@ -620,6 +620,11 @@ export default function LGSTakipSistemi() {
   const [kaynaklar, setKaynaklar] = useState(defaultKaynaklar());
   const [refleksiyonlar, setRefleksiyonlar] = useState(defaultRefleksiyonlar());
   const [showReportModal, setShowReportModal] = useState(false);
+  const [pomodoroSession, setPomodoroSession] = useState({
+    isRunning: false,
+    startTime: null,
+    sessionNumber: 1
+  });
 
   // 1 Aylık Simülasyon Verisini Yükle (Test ve İnceleme Modu)
   const loadMockDataSimulation = useCallback(() => {
@@ -686,7 +691,7 @@ export default function LGSTakipSistemi() {
     (async () => {
       const mock = generate1MonthMockData();
       const isInit = await loadKey("lgs_initialized", false);
-      const [p, d, k, pr, y, sg, hg, ky, rf] = await Promise.all([
+      const [p, d, k, pr, y, sg, hg, ky, rf, ps] = await Promise.all([
         loadKey("lgs_profile", null),
         loadKey("lgs_denemeler", null),
         loadKey("lgs_konular", null),
@@ -696,6 +701,7 @@ export default function LGSTakipSistemi() {
         loadKey("lgs_haftalik_gecmis", null),
         loadKey("lgs_kaynaklar", null),
         loadKey("lgs_refleksiyonlar", null),
+        loadKey("lgs_pomodoro_session", null),
       ]);
 
       if (isInit) {
@@ -708,6 +714,7 @@ export default function LGSTakipSistemi() {
         setHaftalikGecmis(hg || []);
         setKaynaklar(ky || []);
         setRefleksiyonlar(rf || []);
+        if (ps) setPomodoroSession(ps);
       } else {
         // İlk kez açılıyorsa örnek 1 aylık verileri yükle ve başlat
         saveKey("lgs_initialized", true);
@@ -767,6 +774,7 @@ export default function LGSTakipSistemi() {
   useEffect(() => { if (loaded) saveKey("lgs_haftalik_gecmis", haftalikGecmis); }, [haftalikGecmis, loaded]);
   useEffect(() => { if (loaded) saveKey("lgs_kaynaklar", kaynaklar); }, [kaynaklar, loaded]);
   useEffect(() => { if (loaded) saveKey("lgs_refleksiyonlar", refleksiyonlar); }, [refleksiyonlar, loaded]);
+  useEffect(() => { if (loaded) saveKey("lgs_pomodoro_session", pomodoroSession); }, [pomodoroSession, loaded]);
 
   // Streak Hesabı
   const streak = useMemo(() => {
@@ -1156,14 +1164,29 @@ export default function LGSTakipSistemi() {
           {activeTab === "pomodoro" && (
             <Pomodoro
               profile={profile}
-              onCompleteSession={(minutes) => {
-                setProfile((prev) => ({
-                  ...prev,
-                  pomodoroStats: {
-                    totalMinutes: (prev.pomodoroStats?.totalMinutes || 0) + minutes,
-                    completedSessions: (prev.pomodoroStats?.completedSessions || 0) + 1
+              pomodoroSession={pomodoroSession}
+              setPomodoroSession={setPomodoroSession}
+              onCompleteSession={(minutes, sessionNumber, ders) => {
+                const todayKey = todayISO();
+                setProfile((prev) => {
+                  const currentStats = prev.pomodoroStats || { totalMinutes: 0, completedSessions: 0, dailyLogs: {} };
+                  const currentDailyLogs = currentStats.dailyLogs || {};
+                  const todayLogs = currentDailyLogs[todayKey] || [];
+                  return {
+                    ...prev,
+                    pomodoroStats: {
+                      totalMinutes: currentStats.totalMinutes + minutes,
+                      completedSessions: currentStats.completedSessions + 1,
+                      dailyLogs: {
+                        ...currentDailyLogs,
+                        [todayKey]: [
+                          ...todayLogs,
+                          { sessionNumber, duration: minutes, subject: ders, time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) }
+                        ]
+                      }
+                    }
                   }
-                }));
+                });
                 markActive();
                 triggerConfetti();
               }}
@@ -4200,162 +4223,146 @@ function YanlisDefteri({ yanlislar, onAdd, onToggle, onDelete }) {
 /* 6. POMODORO & ODAK ZAMANLAYICISI                                       */
 /* ---------------------------------------------------------------------- */
 
-function Pomodoro({ profile, onCompleteSession }) {
-  const [minutes, setMinutes] = useState(25);
-  const [seconds, setSeconds] = useState(0);
-  const [isActive, setIsActive] = useState(false);
-  const [mode, setMode] = useState("focus"); // focus, shortBreak, longBreak
+function Pomodoro({ profile, pomodoroSession, setPomodoroSession, onCompleteSession }) {
+  const [elapsed, setElapsed] = useState(0);
   const [selectedSubject, setSelectedSubject] = useState(SUBJECTS[0].key);
 
-  const initialMinutes = mode === "focus" ? 25 : mode === "shortBreak" ? 5 : 15;
-
   useEffect(() => {
-    let interval = null;
-    if (isActive) {
+    let interval;
+    if (pomodoroSession.isRunning) {
+      setElapsed(Math.floor((Date.now() - pomodoroSession.startTime) / 1000));
       interval = setInterval(() => {
-        if (seconds > 0) {
-          setSeconds((s) => s - 1);
-        } else if (minutes > 0) {
-          setMinutes((m) => m - 1);
-          setSeconds(59);
-        } else {
-          // Süre bitti!
-          clearInterval(interval);
-          setIsActive(false);
-          if (mode === "focus") {
-            onCompleteSession(initialMinutes);
-            alert("Tebrikler! Odaklanma süreniz tamamlandı.");
-          }
-        }
+        setElapsed(Math.floor((Date.now() - pomodoroSession.startTime) / 1000));
       }, 1000);
     } else {
-      clearInterval(interval);
+      setElapsed(0);
     }
     return () => clearInterval(interval);
-  }, [isActive, minutes, seconds, mode, initialMinutes, onCompleteSession]);
+  }, [pomodoroSession.isRunning, pomodoroSession.startTime]);
 
-  const switchMode = (newMode, duration) => {
-    setIsActive(false);
-    setMode(newMode);
-    setMinutes(duration);
-    setSeconds(0);
+  const handleStart = () => {
+    setPomodoroSession(prev => ({
+      ...prev,
+      isRunning: true,
+      startTime: Date.now()
+    }));
+  };
+
+  const handleStop = () => {
+    const elapsedMinutes = Math.floor(elapsed / 60) || 1; 
+    onCompleteSession(elapsedMinutes, pomodoroSession.sessionNumber, selectedSubject);
+    setPomodoroSession(prev => ({
+      ...prev,
+      isRunning: false,
+      startTime: null,
+      sessionNumber: prev.sessionNumber + 1
+    }));
+    setElapsed(0);
+  };
+
+  const formatTime = (totalSeconds) => {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
 
   const totalMinutesStudied = profile.pomodoroStats?.totalMinutes || 0;
   const totalSessions = profile.pomodoroStats?.completedSessions || 0;
+  
+  const todayKey = todayISO();
+  const dailyLogs = profile.pomodoroStats?.dailyLogs?.[todayKey] || [];
 
   return (
     <div className="flex flex-col gap-5 animate-fade-in">
-      <SectionTitle icon={Clock}>Odaklanma & Pomodoro Zamanlayıcısı</SectionTitle>
+      <SectionTitle icon={Clock}>Ders / Oturum Takibi</SectionTitle>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <Card className="md:col-span-2 text-center p-8 flex flex-col items-center justify-center">
-          {/* MOD SEÇİMİ */}
-          <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl mb-8">
-            <button
-              onClick={() => switchMode("focus", 25)}
-              className="px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition"
-              style={{
-                background: mode === "focus" ? "#FFFFFF" : "transparent",
-                color: mode === "focus" ? COLORS.primary : COLORS.inkSoft,
-                boxShadow: mode === "focus" ? "0 2px 6px rgba(0,0,0,0.08)" : "none"
-              }}
-            >
-              Odaklanma (25 Dk)
-            </button>
-            <button
-              onClick={() => switchMode("shortBreak", 5)}
-              className="px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition"
-              style={{
-                background: mode === "shortBreak" ? "#FFFFFF" : "transparent",
-                color: mode === "shortBreak" ? COLORS.success : COLORS.inkSoft,
-                boxShadow: mode === "shortBreak" ? "0 2px 6px rgba(0,0,0,0.08)" : "none"
-              }}
-            >
-              Kısa Mola (5 Dk)
-            </button>
-            <button
-              onClick={() => switchMode("longBreak", 15)}
-              className="px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition"
-              style={{
-                background: mode === "longBreak" ? "#FFFFFF" : "transparent",
-                color: mode === "longBreak" ? COLORS.purple : COLORS.inkSoft,
-                boxShadow: mode === "longBreak" ? "0 2px 6px rgba(0,0,0,0.08)" : "none"
-              }}
-            >
-              Uzun Mola (15 Dk)
-            </button>
+        <Card className="md:col-span-2 text-center p-8 flex flex-col items-center justify-center relative">
+          
+          <div className="absolute top-4 left-4 flex items-center gap-2">
+             <div className="w-3 h-3 rounded-full animate-pulse" style={{ background: pomodoroSession.isRunning ? COLORS.success : COLORS.inkSoft }} />
+             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+               {pomodoroSession.isRunning ? "Oturum Devam Ediyor" : "Oturum Bekliyor"}
+             </span>
           </div>
 
-          {/* DERS SEÇİMİ */}
-          {mode === "focus" && (
-            <div className="mb-6 flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-500">Çalışılan Ders:</span>
-              <select
-                value={selectedSubject}
-                onChange={(e) => setSelectedSubject(e.target.value)}
-                className="rounded-xl px-3 py-1.5 text-xs font-bold border border-slate-200 bg-white cursor-pointer"
-              >
-                {SUBJECTS.map((s) => <option key={s.key} value={s.key}>{s.name}</option>)}
-              </select>
-            </div>
-          )}
+          <div className="text-xl font-bold text-slate-800 mb-6 mt-4">
+            Ders {pomodoroSession.sessionNumber}
+          </div>
 
-          {/* SAYACIN GÖRÜNÜMÜ */}
+          <div className="mb-6 flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500">Çalışılan Ders:</span>
+            <select
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value)}
+              disabled={pomodoroSession.isRunning}
+              className="rounded-xl px-3 py-1.5 text-xs font-bold border border-slate-200 bg-white cursor-pointer disabled:opacity-50"
+            >
+              {SUBJECTS.map((s) => <option key={s.key} value={s.key}>{s.name}</option>)}
+            </select>
+          </div>
+
           <div className="font-mono font-extrabold text-7xl sm:text-8xl text-slate-900 tracking-tight my-4">
-            {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+            {formatTime(elapsed)}
           </div>
 
-          {/* KONTROL BUTONLARI */}
           <div className="flex items-center gap-3 mt-6">
-            <button
-              onClick={() => setIsActive(!isActive)}
-              className="btn-primary flex items-center gap-2 px-8 py-3.5 rounded-2xl text-base font-bold"
-            >
-              {isActive ? <Pause size={20} /> : <Play size={20} />}
-              {isActive ? "Duraklat" : "Başlat"}
-            </button>
-
-            <button
-              onClick={() => {
-                setIsActive(false);
-                setMinutes(initialMinutes);
-                setSeconds(0);
-              }}
-              className="btn-secondary p-3.5 rounded-2xl"
-              title="Sıfırla"
-            >
-              <RotateCcw size={20} />
-            </button>
+            {!pomodoroSession.isRunning ? (
+              <button
+                onClick={handleStart}
+                className="btn-primary flex items-center gap-2 px-8 py-3.5 rounded-2xl text-base font-bold cursor-pointer"
+              >
+                <Play size={20} /> Ders Başlat
+              </button>
+            ) : (
+              <button
+                onClick={handleStop}
+                className="bg-red-500 hover:bg-red-600 text-white flex items-center gap-2 px-8 py-3.5 rounded-2xl text-base font-bold transition shadow-lg shadow-red-500/20 cursor-pointer"
+              >
+                <Check size={20} /> Ders Bitir
+              </button>
+            )}
           </div>
         </Card>
 
-        {/* POMODORO İSTATİSTİKLERİ */}
         <div className="flex flex-col gap-4">
           <Card>
-            <SectionTitle icon={Award}>Odak İstatistikleri</SectionTitle>
-            <div className="flex flex-col gap-3">
-              <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-100">
-                <div className="text-xs text-blue-700 font-semibold">Toplam Odak Süresi</div>
-                <div className="font-mono text-2xl font-bold text-blue-900 mt-0.5">
-                  {totalMinutesStudied} <span className="text-xs font-sans font-medium text-blue-700">dakika</span>
+            <SectionTitle icon={Award}>Günlük Kayıtlar</SectionTitle>
+            <div className="flex flex-col gap-2 max-h-[250px] overflow-y-auto pr-2">
+              {dailyLogs.length === 0 ? (
+                <div className="text-xs text-slate-400 text-center py-4 italic">Bugün henüz ders kaydedilmedi.</div>
+              ) : (
+                dailyLogs.map((log, idx) => {
+                   const s = SUBJECTS.find(x => x.key === log.subject);
+                   return (
+                     <div key={idx} className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between">
+                       <div>
+                         <div className="text-xs font-bold text-slate-800">Ders {log.sessionNumber}</div>
+                         <div className="text-[10px] text-slate-500 font-medium" style={{ color: s?.color }}>{s?.name} • {log.time}</div>
+                       </div>
+                       <div className="font-mono text-sm font-bold text-emerald-600">
+                         {log.duration} dk
+                       </div>
+                     </div>
+                   );
+                })
+              )}
+            </div>
+            
+            <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl bg-blue-50/60 border border-blue-100 text-center">
+                <div className="text-[10px] text-blue-700 font-semibold mb-1">Toplam Süre</div>
+                <div className="font-mono text-xl font-bold text-blue-900">
+                  {totalMinutesStudied} <span className="text-[10px]">dk</span>
                 </div>
               </div>
-
-              <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-100">
-                <div className="text-xs text-emerald-700 font-semibold">Tamamlanan Oturum</div>
-                <div className="font-mono text-2xl font-bold text-emerald-900 mt-0.5">
-                  {totalSessions} <span className="text-xs font-sans font-medium text-emerald-700">Pomodoro</span>
+              <div className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-100 text-center">
+                <div className="text-[10px] text-emerald-700 font-semibold mb-1">Toplam Oturum</div>
+                <div className="font-mono text-xl font-bold text-emerald-900">
+                  {totalSessions}
                 </div>
               </div>
             </div>
-          </Card>
-
-          <Card>
-            <div className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Pomodoro Tekniği</div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              25 dakika boyunca dikkatinizi dağıtacak her şeyi (telefon, bildirimler) kapatın. Süre bitiminde 5 dakika mola verin. Bu yöntem LGS soru çözümlerinde odaklanma eşiğinizi yükseltir.
-            </p>
           </Card>
         </div>
       </div>
