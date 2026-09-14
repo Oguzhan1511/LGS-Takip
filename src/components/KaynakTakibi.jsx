@@ -34,6 +34,7 @@ export function KaynakTakibi({
     if (!newBook.ad.trim()) return;
     onAddKaynak({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      tarih: new Date().toISOString().split('T')[0],
       ders: newBook.ders,
       ad: newBook.ad.trim(),
       yayin: newBook.yayin.trim() || "Yayın Belirtilmedi",

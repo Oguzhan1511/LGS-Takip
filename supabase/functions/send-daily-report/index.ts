@@ -39,12 +39,14 @@ Deno.serve(async (req) => {
     for (const state of appStates) {
       const profile = state.lgs_profile || {};
       const program = state.lgs_program || {};
+      const kaynaklar = state.lgs_kaynaklar || [];
       
       const veliTelefon = profile.veliTelefon;
       if (!veliTelefon) continue;
 
       // Bugünün programını çıkar
       const today = new Date();
+      const todayString = new Date(today.getTime() + (3 * 60 * 60 * 1000)).toISOString().split('T')[0];
       const gunIsimleri = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
       const gunStr = gunIsimleri[today.getDay()];
       
@@ -64,11 +66,30 @@ Deno.serve(async (req) => {
         }
       });
 
+      let bosSayisi = Math.max(0, tamamlanan - (dogruSayisi + yanlisSayisi));
+
+      let bugunEklenenKaynak = 0;
+      let bugunEklenenTest = 0;
+      kaynaklar.forEach((k: any) => {
+        if (k.tarih === todayString) {
+          bugunEklenenKaynak++;
+          bugunEklenenTest += Number(k.toplamTest) || 0;
+        }
+      });
+
+      let calisilanDakika = 0;
+      const dailyLogs = profile.pomodoroStats?.dailyLogs?.[todayString] || [];
+      dailyLogs.forEach((log: any) => {
+        calisilanDakika += Number(log.duration) || 0;
+      });
+
       const mesaj = `📅 *LGS Karargâhı - Günlük Veli Raporu*\n` +
                     `Öğrenci: ${profile.isim || 'Öğrenci'}\n\n` +
                     `🎯 *Bugünkü Hedef:* ${toplamSoru} Soru\n` +
                     `✍️ *Çözülen Soru:* ${tamamlanan}\n` +
-                    `✅ *Doğru:* ${dogruSayisi} | ❌ *Yanlış:* ${yanlisSayisi}\n\n` +
+                    `✅ *Doğru:* ${dogruSayisi} | ❌ *Yanlış:* ${yanlisSayisi} | ➖ *Boş:* ${bosSayisi}\n\n` +
+                    `📚 *Kitaplığa Eklenen:* ${bugunEklenenKaynak} Kitap (${bugunEklenenTest} Test)\n` +
+                    `⏱️ *Çalışılan Süre:* ${calisilanDakika} dk\n\n` +
                     `LGS'ye ${profile.hedefOkul || ''} yolunda başarılar!`;
 
       // Telegram API'ye Gönder
