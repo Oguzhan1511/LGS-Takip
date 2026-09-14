@@ -3827,6 +3827,130 @@ function Program({
           </div>
         </div>
       )}
+
+      {/* MODAL: HAFTAYI ARŞİVLE VE YENİ HAFTAYA BAŞLA */}
+      {showArchiveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Archive size={20} className="text-amber-500" />
+                <h3 className="font-display font-bold text-base text-slate-900">Haftayı Arşivle</h3>
+              </div>
+              <button onClick={() => setShowArchiveModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Hafta Etiketi</label>
+              <input
+                type="text"
+                value={archiveTitle}
+                onChange={(e) => setArchiveTitle(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:border-amber-400"
+                placeholder="Örn: 1. Hafta"
+              />
+            </div>
+
+            <div className="mb-5">
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Tarih Aralığı</label>
+              <input
+                type="text"
+                value={archiveDateRange}
+                onChange={(e) => setArchiveDateRange(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:border-amber-400"
+                placeholder="Örn: 10 Eyl - 16 Eyl"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowArchiveModal(false)}
+                className="btn-secondary px-4 py-2 rounded-xl text-xs cursor-pointer"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleSaveArchive}
+                className="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Arşivle & Yeni Haftaya Başla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: GEÇMİŞ HAFTA EKLEME */}
+      {showAddPastModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Plus size={20} className="text-blue-500" />
+                <h3 className="font-display font-bold text-base text-slate-900">Geçmiş Hafta Ekle</h3>
+              </div>
+              <button onClick={() => setShowAddPastModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Hafta Etiketi</label>
+                <input type="text" value={pastTitle} onChange={(e) => setPastTitle(e.target.value)} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none" placeholder="Örn: 2 Hafta Önce" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Tarih Aralığı</label>
+                <input type="text" value={pastDateRange} onChange={(e) => setPastDateRange(e.target.value)} className="w-full border border-slate-200 rounded-xl p-2.5 text-sm outline-none" placeholder="Örn: 1 Eyl - 7 Eyl" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1 text-center">Hedef</label>
+                <input type="number" value={pastHedef} onChange={(e) => setPastHedef(e.target.value)} className="w-full border border-slate-200 rounded-xl p-2 text-sm text-center outline-none" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1 text-center">Çözülen</label>
+                <input type="number" value={pastCozulen} onChange={(e) => setPastCozulen(e.target.value)} className="w-full border border-slate-200 rounded-xl p-2 text-sm text-center outline-none" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-emerald-600 block mb-1 text-center">Doğru</label>
+                <input type="number" value={pastDogru} onChange={(e) => setPastDogru(e.target.value)} className="w-full border border-emerald-200 bg-emerald-50 rounded-xl p-2 text-sm text-center outline-none" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-rose-600 block mb-1 text-center">Yanlış</label>
+                <input type="number" value={pastYanlis} onChange={(e) => setPastYanlis(e.target.value)} className="w-full border border-rose-200 bg-rose-50 rounded-xl p-2 text-sm text-center outline-none" />
+              </div>
+            </div>
+            
+            <div className="mb-4">
+              <label className="text-xs font-semibold text-slate-600 block mb-2">Derslere Göre Çözülen (Opsiyonel)</label>
+              <div className="grid grid-cols-2 gap-2">
+                {SUBJECTS.map((s) => (
+                  <div key={s.key} className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold w-12 truncate" style={{ color: s.color }}>{s.name}</span>
+                    <input 
+                      type="number" 
+                      value={pastDersler[s.key] || ""} 
+                      onChange={(e) => setPastDersler({...pastDersler, [s.key]: Number(e.target.value) || 0})}
+                      className="flex-1 border border-slate-200 rounded p-1 text-xs outline-none" 
+                      placeholder="Sayı"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowAddPastModal(false)} className="btn-secondary px-4 py-2 rounded-xl text-xs cursor-pointer">İptal</button>
+              <button onClick={handleSavePastWeek} className="btn-primary px-5 py-2 rounded-xl text-xs font-bold cursor-pointer">Ekle</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
