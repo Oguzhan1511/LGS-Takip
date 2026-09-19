@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Günlük raporu gönder
         run: |
-          curl -X POST "https://lgs-takip.vercel.app/api/send-daily-report" \
+          curl -X POST "https://lgs-takip-bice.vercel.app/api/send-daily-report" \
             -H "Content-Type: application/json" \
             --fail \
             --silent \
