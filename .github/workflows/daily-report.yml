@@ -1,0 +1,19 @@
+name: Günlük Veli Raporu
+
+on:
+  schedule:
+    # Her gün 23:00 Türkiye saatinde (UTC 20:00)
+    - cron: '0 20 * * *'
+  workflow_dispatch: # Manuel tetikleme için
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Günlük raporu gönder
+        run: |
+          curl -X POST "${{ secrets.VERCEL_APP_URL }}/api/send-daily-report" \
+            -H "Content-Type: application/json" \
+            --fail \
+            --silent \
+            --show-error
