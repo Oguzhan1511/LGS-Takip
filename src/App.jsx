@@ -15,6 +15,7 @@ import {
 import confetti from "canvas-confetti";
 
 import { VeliRaporModal, VeliRaporPage } from "./components/VeliRaporModal";
+import { ProgramYazdirModal } from "./components/ProgramYazdirModal";
 import { SmartRecommendations } from "./components/SmartRecommendations";
 import { KaynakTakibi } from "./components/KaynakTakibi";
 import { SpacedRepetition } from "./components/SpacedRepetition";
@@ -44,7 +45,7 @@ const COLORS = {
   cyan: "#06B6D4",
 };
 
-const SUBJECTS = [
+export const SUBJECTS = [
   { key: "turkce", name: "Türkçe", color: "#EF4444", max: 20, katsayi: 4 },
   { key: "matematik", name: "Matematik", color: "#2563EB", max: 20, katsayi: 4 },
   { key: "fen", name: "Fen Bilimleri", color: "#10B981", max: 20, katsayi: 4 },
@@ -1058,6 +1059,7 @@ export default function LGSTakipSistemi() {
             <Program
               program={program}
               haftalikGecmis={haftalikGecmis}
+              profile={profile}
               onAdd={(day, item) => {
                 setProgram((prev) => ({ ...prev, [day]: [...(prev[day] || []), item] }));
               }}
@@ -2941,6 +2943,7 @@ function TopicAnalysisCard({ denemeler }) {
 function Program({
   program,
   haftalikGecmis = [],
+  profile = {},
   onAdd,
   onComplete,
   onReopen,
@@ -2961,6 +2964,9 @@ function Program({
   const [modalCozulen, setModalCozulen] = useState(20);
   const [modalDogru, setModalDogru] = useState(18);
   const [modalYanlis, setModalYanlis] = useState(2);
+
+  // Yazdırma Modalı State'i
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   // Arşivleme Modalı State'i
   const [showArchiveModal, setShowArchiveModal] = useState(false);
@@ -3215,18 +3221,28 @@ function Program({
 
         <div className="flex items-center gap-2">
           {programViewTab === "aktif" ? (
-            <button
-              onClick={() => {
-                setArchiveTitle(`Hafta (${fmtDate(todayISO())})`);
-                setArchiveDateRange("Bu Hafta");
-                setShowArchiveModal(true);
-              }}
-              className="btn-secondary text-xs px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition"
-              title="Bu haftayı arşivle ve yeni haftanın programını temizle"
-            >
-              <Archive size={15} className="text-amber-600" />
-              <span>Haftayı Arşivle & Yeni Haftaya Başla</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowPrintModal(true)}
+                className="btn-primary text-xs px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 transition"
+                title="Programı PDF Olarak İndir / Yazdır"
+              >
+                <Printer size={15} />
+                <span className="hidden sm:inline">PDF Çıktısı Al</span>
+              </button>
+              <button
+                onClick={() => {
+                  setArchiveTitle(`Hafta (${fmtDate(todayISO())})`);
+                  setArchiveDateRange("Bu Hafta");
+                  setShowArchiveModal(true);
+                }}
+                className="btn-secondary text-xs px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition"
+                title="Bu haftayı arşivle ve yeni haftanın programını temizle"
+              >
+                <Archive size={15} className="text-amber-600" />
+                <span className="hidden sm:inline">Haftayı Arşivle</span>
+              </button>
+            </div>
           ) : (
             <div className="flex items-center gap-2">
               <button
@@ -3974,6 +3990,14 @@ function Program({
           </div>
         </div>
       )}
+
+      {/* YAZDIRMA MODALI (PDF) */}
+      <ProgramYazdirModal
+        isOpen={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        program={program}
+        profile={profile}
+      />
     </div>
   );
 }
