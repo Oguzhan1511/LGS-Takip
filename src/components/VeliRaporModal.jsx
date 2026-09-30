@@ -302,8 +302,23 @@ export function VeliRaporContent({
     });
 
     if (isCustomRangeValid) {
-      Object.entries(program || {}).forEach(([dateKey, dayTasks]) => {
-        if (dateKey >= customStart && dateKey <= customEnd) {
+      // Bu haftanın günlerini gerçek ISO tarihlerine eşle
+      const dayNames = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
+      const now = new Date();
+      const currentDay = now.getDay();
+      const diffToMon = now.getDate() - currentDay + (currentDay === 0 ? -6 : 1);
+      
+      const weekDates = {};
+      dayNames.forEach((d, idx) => {
+        const dateObj = new Date(now.getFullYear(), now.getMonth(), diffToMon + idx);
+        // ISO string formatına çevir (YYYY-MM-DD), yerel saate göre düzeltilmiş
+        dateObj.setMinutes(dateObj.getMinutes() - dateObj.getTimezoneOffset());
+        weekDates[d] = dateObj.toISOString().split("T")[0];
+      });
+
+      Object.entries(program || {}).forEach(([dayName, dayTasks]) => {
+        const dateKey = weekDates[dayName];
+        if (dateKey && dateKey >= customStart && dateKey <= customEnd) {
           (dayTasks || []).forEach((t) => {
             const sKey = t.ders;
             if (map[sKey]) {
@@ -332,6 +347,7 @@ export function VeliRaporContent({
         }
       });
 
+
       // soruGecmisi: tarih filtresi uygulanabilen kayıtlar
       (soruGecmisi || []).forEach((entry) => {
         const sKey = entry.ders;
@@ -351,6 +367,67 @@ export function VeliRaporContent({
           map[sKey].cozulenSoru += Number(entry.cozulen) || 0;
           map[sKey].dogru += Number(entry.dogru) || 0;
           map[sKey].yanlis += Number(entry.yanlis) || 0;
+        }
+      });
+
+      // haftalikGecmis: arşivlenmiş geçmiş verileri dahil et (tarih aralığı kesişiyorsa)
+      const parseTarih = (str, currentYear) => {
+        if (!str) return null;
+        const months = {
+          "ocak": 0, "oca": 0, "şubat": 1, "şub": 1, "mart": 2, "mar": 2,
+          "nisan": 3, "nis": 3, "mayıs": 4, "may": 4, "haziran": 5, "haz": 5,
+          "temmuz": 6, "tem": 6, "ağustos": 7, "ağu": 7, "eylül": 8, "eyl": 8,
+          "ekim": 9, "eki": 9, "kasım": 10, "kas": 10, "aralık": 11, "ara": 11
+        };
+        const words = str.toLowerCase().replace(/[^a-z0-9çğıöşü\s-]/g, "").split(/\s+/);
+        const numbers = words.filter(w => !isNaN(parseInt(w))).map(w => parseInt(w));
+        if (numbers.length === 0) return null;
+        
+        const foundMonths = words.map(w => months[w]).filter(m => m !== undefined);
+        const m = foundMonths.length > 0 ? foundMonths[foundMonths.length - 1] : new Date().getMonth();
+        const y = numbers.find(n => n > 2000) || currentYear;
+        
+        const startDay = numbers[0];
+        const endDay = numbers.length > 1 && numbers[1] < 32 ? numbers[1] : startDay;
+        
+        let startMonth = m;
+        let endMonth = m;
+        if (foundMonths.length >= 2) {
+          startMonth = foundMonths[0];
+          endMonth = foundMonths[1];
+        } else if (startDay > endDay) {
+          // If days cross month boundary and only one month given, assume start is previous month
+          startMonth = (m - 1 + 12) % 12;
+        }
+        
+        const dStart = new Date(y, startMonth, startDay);
+        const dEnd = new Date(y, endMonth, endDay);
+        dStart.setMinutes(dStart.getMinutes() - dStart.getTimezoneOffset());
+        dEnd.setMinutes(dEnd.getMinutes() - dEnd.getTimezoneOffset());
+        
+        return {
+          start: dStart.toISOString().split("T")[0],
+          end: dEnd.toISOString().split("T")[0]
+        };
+      };
+
+      const cYear = new Date().getFullYear();
+      (haftalikGecmis || []).forEach((w) => {
+        if (!w.tarihAraligi) return;
+        const parsed = parseTarih(w.tarihAraligi, cYear);
+        if (!parsed) return;
+        
+        // Kesişim kontrolü: (w.start <= customEnd) && (w.end >= customStart)
+        if (parsed.start <= customEnd && parsed.end >= customStart) {
+          subjects.forEach((s) => {
+            const dersSoru = w.dersler?.[s.key] || 0;
+            if (map[s.key] && dersSoru > 0) {
+              map[s.key].cozulenSoru += dersSoru;
+              const ratio = w.toplamSoru > 0 ? dersSoru / w.toplamSoru : 0;
+              map[s.key].dogru += Math.round((w.dogru || 0) * ratio);
+              map[s.key].yanlis += Math.round((w.yanlis || 0) * ratio);
+            }
+          });
         }
       });
     }
