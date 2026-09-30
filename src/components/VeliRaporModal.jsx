@@ -419,13 +419,28 @@ export function VeliRaporContent({
         
         // Kesişim kontrolü: (w.start <= customEnd) && (w.end >= customStart)
         if (parsed.start <= customEnd && parsed.end >= customStart) {
+          const s1 = new Date(parsed.start).getTime();
+          const e1 = new Date(parsed.end).getTime();
+          const s2 = new Date(customStart).getTime();
+          const e2 = new Date(customEnd).getTime();
+          
+          const intersectionStart = Math.max(s1, s2);
+          const intersectionEnd = Math.min(e1, e2);
+          
+          const intersectionDays = (intersectionEnd - intersectionStart) / (1000 * 60 * 60 * 24) + 1;
+          const totalDays = (e1 - s1) / (1000 * 60 * 60 * 24) + 1;
+          const overlapRatio = Math.max(0, Math.min(1, intersectionDays / Math.max(1, totalDays)));
+
           subjects.forEach((s) => {
             const dersSoru = w.dersler?.[s.key] || 0;
             if (map[s.key] && dersSoru > 0) {
-              map[s.key].cozulenSoru += dersSoru;
-              const ratio = w.toplamSoru > 0 ? dersSoru / w.toplamSoru : 0;
-              map[s.key].dogru += Math.round((w.dogru || 0) * ratio);
-              map[s.key].yanlis += Math.round((w.yanlis || 0) * ratio);
+              const allocatedDersSoru = Math.round(dersSoru * overlapRatio);
+              map[s.key].cozulenSoru += allocatedDersSoru;
+              
+              const subjectRatio = w.toplamSoru > 0 ? dersSoru / w.toplamSoru : 0;
+              map[s.key].dogru += Math.round((w.dogru || 0) * subjectRatio * overlapRatio);
+              map[s.key].yanlis += Math.round((w.yanlis || 0) * subjectRatio * overlapRatio);
+              map[s.key].hedefSoru += Math.round((w.hedefSoru || 0) * subjectRatio * overlapRatio);
             }
           });
         }
@@ -447,7 +462,7 @@ export function VeliRaporContent({
       basari: d.cozulenSoru > 0 ? Math.round((d.dogru / d.cozulenSoru) * 100) : 0,
       tamamlanma: d.hedefSoru > 0 ? Math.round((d.cozulenSoru / d.hedefSoru) * 100) : 0,
     }));
-  }, [program, subjects, customStart, customEnd, isCustomRangeValid, soruGecmisi]);
+  }, [program, subjects, customStart, customEnd, isCustomRangeValid, soruGecmisi, haftalikGecmis]);
 
   const ozelToplam = useMemo(() => {
     let hedef = 0, cozulen = 0, dogru = 0, yanlis = 0;
